@@ -4,34 +4,35 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
-
-    crane = {
-      url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    roc.url = "github:roc-lang/roc";
   };
 
-  outputs = { self, nixpkgs, flake-utils, crane }:
+  outputs = { self, nixpkgs, flake-utils, roc }:
     flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = nixpkgs.legacyPackages.${system};
-          craneLib = crane.lib.${system};
-          roc = crane.lib.${system}.downloadCargoPackageFromGit {
-            git = "https://github.com/roc-lang/roc.git";
-            rev = "bf937b2b38d338072ba1f440c493015e9b583751";
-          };
-      in {
-        packages = {
-          default = roc;
+      let
+        pkgs = import nixpkgs { inherit system; };
+        rocPkgs = roc.packages.${system};
+
+        linuxInputs = with pkgs;
+          lib.optionals stdenv.isLinux [
+          ];
+
+        darwinInputs = with pkgs;
+          lib.optionals stdenv.isDarwin
+            (with pkgs.darwin.apple_sdk.frameworks; [
+            ]);
+
+        sharedInputs = (with pkgs; [
+          expect
+          rocPkgs.cli
+        ]);
+      in
+      {
+
+        devShell = pkgs.mkShell {
+          buildInputs = sharedInputs ++ darwinInputs ++ linuxInputs;
         };
 
         formatter = pkgs.nixpkgs-fmt;
-
-        devShell = pkgs.mkShell {
-          nativeBuildInputs = [ pkgs.just pkgs.git ];
-          shellHook = ''
-            alias make=just
-          '';
-        };
-
       });
 }
